@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -8,21 +9,25 @@ public class PlayerController : MonoBehaviour
 
     [Header("Player References")]
     [SerializeField] private PlayerCastSkill castSkill;
+    [SerializeField] private int maxHealth = 100;
 
     [Header("Attack Timings")]
     [SerializeField] private float attackDuration = 0.4f;
 
+    private int currentHealth;
     private Rigidbody2D rb;
     private Vector2 movement;
     private Animator animator;
     private Vector2 lastMoveDirection = new(0f, -1f); // Down
 
     private bool isAttacking = false;
+    private bool isKnockedBack;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
+        currentHealth = maxHealth;
 
         if (!castSkill)
         {
@@ -71,6 +76,8 @@ public class PlayerController : MonoBehaviour
     {
         movement = Vector2.zero;
 
+        if (!CanMove()) return;
+
         if (Keyboard.current != null)
         {
             if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed)
@@ -115,7 +122,7 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (!rb) return;
+        if (!rb || isKnockedBack) return;
 
         rb.MovePosition(rb.position + moveSpeed * Time.fixedDeltaTime * movement);
     }
@@ -124,4 +131,26 @@ public class PlayerController : MonoBehaviour
     {
         CancelInvoke(nameof(ResetAttack));
     }
+
+    public void TakeDamage(int damage, Vector2 knockbackDirection, float knockbackForce, float knockbackDuration)
+    {
+        if (isKnockedBack) return;
+
+        currentHealth -= damage;
+        StartCoroutine(ApplyKnockback(knockbackDirection, knockbackForce, knockbackDuration));
+    }
+
+    private IEnumerator ApplyKnockback(Vector2 direction, float force, float duration)
+    {
+        isKnockedBack = true;
+
+        rb.linearVelocity = direction.normalized * force;
+
+        yield return new WaitForSeconds(duration);
+
+        rb.linearVelocity = Vector2.zero;
+        isKnockedBack = false;
+    }
+
+    public bool CanMove() => !isKnockedBack;
 }
